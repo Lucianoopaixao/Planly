@@ -1,0 +1,164 @@
+
+services:
+  # ─── Infraestrutura ──────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine # Versão estável e leve baseada em Alpine Linux
+    container_name: planly-postgres
+    env_file: .env # Carrega credenciais (POSTGRES_USER, POSTGRES_PASSWORD) do arquivo local .env
+    ports:
+      - "5432:5432" # Expõe a porta para acesso externo (ex: via DBeaver/PgAdmin)
+    volumes:
+      - postgres-data:/var/lib/postgresql/data # Volume persistente para não perder os dados ao derrubar o container
+      - ./database/postgres:/docker-entrypoint-initdb.d:ro # Executa scripts SQL/sh de inicialização (como criação de múltiplos bancos) no primeiro boot
+    healthcheck:
+      # Garante que o Postgres está pronto para receber conexões antes que os microsserviços tentem se conectar
+      test: ["CMD-SHELL", "pg_isready -U planly"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks: [planly-net]
+
+  redis:
+    image: redis:7-alpine
+    container_name: planly-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data # Mantém os dados em cache/fila persistidos no disco
+      - ./database/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro # Injeta arquivo de configuração customizado do Redis
+    command: redis-server /usr/local/etc/redis/redis.conf # Força o Redis a iniciar usando o arquivo de configuração injetado
+    networks: [planly-net]
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine # Inclui o plugin de interface web para gerenciamento de filas
+    container_name: planly-rabbitmq
+    env_file: .env
+    ports:
+      - "5672:5672"   # Porta do protocolo AMQP (comunicação entre os serviços)
+      - "15672:15672" # Porta da interface web (Acesso em: http://localhost:15672)
+    healthcheck:
+      # Evita que os serviços que dependem de mensageria quebrem ao iniciar antes do Broker estar ativo
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks: [planly-net]
+
+  # ─── Microsserviços ──────────────────────────────────────────────
+
+  user-service:
+    build: ./services/user-service # Caminho do Dockerfile local do serviço de usuários
+    container_name: planly-user-service
+    environment:
+      PORT: 4001
+      DB_HOST: postgres # Conecta usando o nome do serviço do Docker como Host da rede interna
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: planly_users # Banco de dados isolado deste microsserviço
+      JWT_SECRET: ${JWT_SECRET}
+    ports:
+      - "4001:4001"
+    depends_on:
+      postgres:
+        condition: service_healthy # Só inicia quando o healthcheck do Postgres passar com sucesso
+    networks: [planly-net]
+
+  planning-service:
+    build: ./services/planning-service
+    container_name: planly-planning-service
+    environment:
+      PORT: 4002
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: planly_planning
+      JWT_SECRET: ${JWT_SECRET}
+      USER_SERVICE_URL: http://user-service:4001 # Comunicação interna síncrona (HTTP/REST) entre containers
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672 # String de conexão para mensageria assíncrona
+    ports:
+      - "4002:4002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy # Aguarda o broker de mensageria estar 100% pronto
+      user-service:
+        condition: service_started # Dependência simples: basta o container de usuários ter iniciado
+    networks: [planly-net]
+
+  gamification-service:
+    build: ./services/gamification-service
+    container_name: planly-gamification-service
+    environment:
+      PORT: 4003
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      DB_NAME: planly_gamification
+      JWT_SECRET: ${JWT_SECRET}
+      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+    ports:
+      - "4003:4003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks: [planly-net]
+
+  analytics-service:
+    build: ./services/analytics-service
+    container_name: planly-analytics-service
+    environment:
+      PORT: 4004
+      JWT_SECRET: ${JWT_SECRET}
+      PLANNING_SERVICE_URL: http://planning-service:4002
+    ports:
+      - "4004:4004"
+    depends_on:
+      - planning-service # Sintaxe simplificada (indica apenas início do container, sem checar saúde)
+    networks: [planly-net]
+
+  # ─── Frontend ────────────────────────────────────────────────────
+
+  frontend:
+    build: ./frontend
+    container_name: planly-frontend
+    environment:
+      # ATENÇÃO: Como o Frontend roda no navegador do cliente (fora da rede do Docker),
+      # as URLs de API devem apontar para 'localhost' e não para o nome dos containers.
+      VITE_USER_SERVICE_URL:         http://localhost:4001
+      VITE_PLANNING_SERVICE_URL:     http://localhost:4002
+      VITE_GAMIFICATION_SERVICE_URL: http://localhost:4003
+      VITE_ANALYTICS_SERVICE_URL:    http://localhost:4004
+    ports:
+      - "3000:3000"
+    volumes:
+      # Espelhamento de arquivos para Desenvolvimento (Hot Reload). 
+      # Qualquer alteração no código local reflete instantaneamente dentro do container.
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/index.html:/app/index.html
+    depends_on:
+      - user-service
+      - planning-service
+      - gamification-service
+      - analytics-service
+    networks: [planly-net]
+
+# ─── Volumes e Redes ────────────────────────────────────────────────
+
+volumes:
+  # Declaração dos volumes nomeados gerenciados pelo Docker para persistência de dados do banco e cache
+  postgres-data:
+  redis-data:
+
+networks:
+  # Cria uma rede isolada do tipo bridge. Todos os containers nela conseguem se
+  # comunicar usando o próprio nome do serviço como endereço IP (DNS interno do Docker).
+  planly-net:
+    driver: bridge
