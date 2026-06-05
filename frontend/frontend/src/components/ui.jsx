@@ -1,4 +1,4 @@
-// Tokens visuais — verde floresta, creme, dourado queimado.
+// Cores utilizadas na aplicacao
 export const c = {
   forest:   '#1f3d34',
   forestD:  '#102822',
@@ -15,10 +15,11 @@ export const c = {
   border:   '#e2d7bc',
   borderS:  '#ecdfc2'
 };
-
+//fontes da aplicacao
 export const fontDisplay = "'Fraunces', 'Times New Roman', serif";
 export const fontBody    = "'Manrope', system-ui, sans-serif";
 
+//importacao das fontes e estilos globais
 export const Fonts = () => (
   <style>{`
     @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,300..900,0..100&family=Manrope:wght@300;400;500;600;700;800&display=swap');
@@ -39,6 +40,7 @@ export const Fonts = () => (
   `}</style>
 );
 
+//nome e logo da aplicacao
 export const Logo = ({ size = 28, color = c.forest }) => (
   <svg width={size} height={size} viewBox="0 0 40 40" fill="none">
     <circle cx="20" cy="20" r="18" stroke={color} strokeWidth="1.5" />
