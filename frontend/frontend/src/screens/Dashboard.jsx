@@ -12,7 +12,7 @@ export default function Dashboard() {
   const [overview, setOverview] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [stats, setStats] = useState(null);
-
+  // Carrega tarefas estatisticas e analises da aplicacao
   const reload = () => {
     const today = new Date(); today.setHours(0,0,0,0);
     const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1);
@@ -22,16 +22,19 @@ export default function Dashboard() {
     analyticsApi.suggestions().then(r => setSuggestions(r.suggestions || [])).catch(() => {});
     gamificationApi.stats().then(setStats).catch(() => {});
   };
+  // responsavel por buscar os dados ao abrir a pagina
   useEffect(reload, []);
 
   const done = tasks.filter(t => t.status === 'concluida').length;
   const totalMin = tasks.reduce((s, t) => s + t.estimated_min, 0);
   const hour = new Date().getHours();
+  // se baseia no horário
   const greet = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
   const firstName = user?.name?.split(' ')[0] || '';
 
   return (
     <div className="fade-up" style={{ display: 'flex', flexDirection: 'column', gap: 40 }}>
+      {/* cabecalho da dashboard */}
       <section>
         <div style={{ fontSize: 11, letterSpacing: '0.3em', textTransform: 'uppercase', color: c.gold }}>
           Â· {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -40,16 +43,16 @@ export default function Dashboard() {
           {greet}, <em style={{ color: c.forestL }}>{firstName}.</em>
         </h1>
         <p style={{ marginTop: 12, maxWidth: 620, color: c.muted, fontSize: '1.05rem' }}>
-          VocÃª tem <strong style={{ color: c.ink }}>{tasks.length - done} tarefas</strong> pendentes hoje,
+          Você tem <strong style={{ color: c.ink }}>{tasks.length - done} tarefas</strong> pendentes hoje,
           somando <strong style={{ color: c.ink }}>{Math.round(totalMin/60*10)/10}h</strong> de trabalho previsto.
         </p>
       </section>
 
       <section style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-        <Stat Icon={Target}     title="Tarefas hoje"    value={`${done}/${tasks.length}`} sub="concluÃ­das" tint={c.forest}/>
+        <Stat Icon={Target}     title="Tarefas hoje"    value={`${done}/${tasks.length}`} sub="concluídas" tint={c.forest}/>
         <Stat Icon={Clock}      title="Tempo previsto" value={`${Math.floor(totalMin/60)}h${totalMin%60}m`} sub="hoje" tint={c.gold}/>
-        <Stat Icon={TrendingUp} title="PrecisÃ£o"       value={`${overview?.precision_pct ?? 'â€”'}%`} sub="estimativa vs real" tint={c.sage}/>
-        <Stat Icon={Flame}      title="SequÃªncia"      value={`${stats?.current_streak ?? 0} d`} sub={`recorde: ${stats?.longest_streak ?? 0}`} tint={c.rust}/>
+        <Stat Icon={TrendingUp} title="Precisão"       value={`${overview?.precision_pct ?? '?'}%`} sub="estimativa vs real" tint={c.sage}/>
+        <Stat Icon={Flame}      title="Sequência"      value={`${stats?.current_streak ?? 0} d`} sub={`recorde: ${stats?.longest_streak ?? 0}`} tint={c.rust}/>
       </section>
 
       <section style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
@@ -75,7 +78,7 @@ export default function Dashboard() {
                 {suggestions[0].message}
               </h3>
               <div style={{ fontSize: 12, color: 'rgba(245,239,227,0.65)', marginTop: 8 }}>
-                Baseado em {suggestions[0].samples} tarefas concluÃ­das.
+                Baseado em {suggestions[0].samples} tarefas concluí­das.
               </div>
             </div>
           )}
@@ -94,11 +97,11 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
-
+      {/* Gráfico de desempenho semanal */}
       {overview?.weekly && (
         <section style={{ background: c.paper, border: `1px solid ${c.borderS}`, borderRadius: 24, padding: 28 }}>
           <h2 style={{ fontFamily: fontDisplay, fontSize: '1.5rem', fontWeight: 500, margin: '0 0 24px' }}>
-            Esta semana â€” previsto vs real
+            Esta semana é previsto vs real
           </h2>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={overview.weekly} barGap={4}>
@@ -115,7 +118,7 @@ export default function Dashboard() {
     </div>
   );
 }
-
+//utilizado para exibir metricas da dashboard
 const Stat = ({ Icon, title, value, sub, tint }) => (
   <div style={{ background: c.paper, border: `1px solid ${c.borderS}`, borderRadius: 18, padding: 20 }}>
     <div style={{ display: 'flex', justifyContent: 'space-between' }}>
