@@ -7,14 +7,17 @@ import { useAuth } from '../context/AuthContext.jsx';
 import { gamificationApi } from '../api/index.js';
 import { c, fontDisplay, fontBody, Brand } from './ui.jsx';
 
+//componente prinecipal responsavel pelo layout da aplicacao
 export default function Shell({ section, setSection, onNewTask, children }) {
+  //dados do usuario autenticado
   const { user, logout } = useAuth();
+  //informacoes da gamificacao do usuario
   const [stats, setStats] = useState({ current_streak: 0, longest_streak: 0 });
 
   useEffect(() => {
     gamificationApi.stats().then(setStats).catch(() => {});
   }, [section]);
-
+  //iten do menu lateral da aplicacao
   const nav = [
     { id: 'dashboard',    label: 'VisÃ£o geral', Icon: Home },
     { id: 'calendar',     label: 'CalendÃ¡rio',  Icon: CalIcon },
@@ -27,13 +30,15 @@ export default function Shell({ section, setSection, onNewTask, children }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: c.cream, color: c.ink, fontFamily: fontBody }}>
       {/* sidebar */}
+      {/* Barra lateral de navegação */}
       <aside style={{
         width: 256, display: 'flex', flexDirection: 'column', padding: 24,
         background: c.paper, borderRight: `1px solid ${c.borderS}`
       }}>
+        {/* Logo da aplicação */}
         <Brand size="md" />
-
         <nav style={{ marginTop: 48, flex: 1 }}>
+          {/* Menu principal */}
           {nav.map(n => {
             const active = section === n.id;
             return (
@@ -66,7 +71,7 @@ export default function Shell({ section, setSection, onNewTask, children }) {
             Recorde: {stats.longest_streak} dias
           </div>
         </div>
-
+        {/* Botão de logout */}
         <button onClick={logout}
           style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: c.muted, padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
           <LogOut size={14}/> Sair
@@ -75,12 +80,14 @@ export default function Shell({ section, setSection, onNewTask, children }) {
 
       {/* main */}
       <main style={{ flex: 1, overflow: 'auto' }} className="scroll-soft">
+        {/* Cabeçalho */}
         <header style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '24px 40px', position: 'sticky', top: 0, zIndex: 10,
           background: 'rgba(243,236,220,0.85)', backdropFilter: 'blur(8px)',
           borderBottom: `1px solid ${c.borderS}`
         }}>
+          {/* Campo de busca */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 12, padding: '8px 16px',
             borderRadius: 999, maxWidth: 460, flex: 1, background: c.paper, border: `1px solid ${c.borderS}`
@@ -89,6 +96,7 @@ export default function Shell({ section, setSection, onNewTask, children }) {
             <input placeholder="Buscarâ€¦" style={{ background: 'transparent', border: 'none', flex: 1, fontSize: 14, color: c.ink, fontFamily: 'inherit' }}/>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Botão para criar tarefa */}
             <button onClick={onNewTask}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px',
@@ -97,6 +105,7 @@ export default function Shell({ section, setSection, onNewTask, children }) {
               }}>
               <Plus size={15}/> Nova tarefa
             </button>
+            
             <div style={{ width: 40, height: 40, borderRadius: 999, background: c.paper, border: `1px solid ${c.borderS}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Bell size={16} color={c.forest}/>
             </div>
@@ -108,7 +117,7 @@ export default function Shell({ section, setSection, onNewTask, children }) {
             </div>
           </div>
         </header>
-
+        {/* Conteúdo da página selecionada */}
         <div style={{ padding: 40, maxWidth: 1280 }}>
           {children}
         </div>
