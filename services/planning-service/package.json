@@ -1,0 +1,20 @@
+{
+  "name": "@planly/planning-service",
+  "version": "1.0.0",
+  "description": "Serviço de planejamento — tarefas, prioridades e sobrecarga",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "cors": "^2.8.5",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.11.5",
+    "amqplib": "^0.10.4",
+    "redis": "^4.6.13",
+    "dotenv": "^16.4.5"
+  }
+}
