@@ -14,20 +14,21 @@ import { NewTaskModal } from './components/Task.jsx';
 
 export default function App() {
   const { user, loading } = useAuth();
+  //controla tela de autenticacao
   const [authView, setAuthView] = useState('login');
   const [section, setSection]   = useState('dashboard');
-  const [taskKey, setTaskKey]   = useState(0);  // forÃ§a reload das telas que listam tarefas
+  const [taskKey, setTaskKey]   = useState(0);  // Força atualizacao das telas que exibem tarefas
   const [newTaskOpen, setNewTaskOpen] = useState(false);
-
+  //tela de carregamento
   if (loading) {
     return <>
       <Fonts/>
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: c.cream, color: c.muted, fontFamily: fontDisplay }}>
-        Carregandoâ€¦
+        Carregando¦
       </div>
     </>;
   }
-
+  //mostra o login ou cadastro se nao tiver usuario autenticado
   if (!user) {
     return <>
       <Fonts/>
@@ -48,7 +49,7 @@ export default function App() {
         {section === 'achievements' && <Achievements/>}
         {section === 'profile'      && <Profile/>}
       </Shell>
-
+      {/* Modal para criacao de tarefa */}
       {newTaskOpen && (
         <NewTaskModal
           onClose={() => setNewTaskOpen(false)}
