@@ -88,40 +88,40 @@ services:
       user-service:
         condition: service_started # Dependência simples: basta o container de usuários ter iniciado
     networks: [planly-net]
-
-  gamification-service:
-    build: ./services/gamification-service
-    container_name: planly-gamification-service
-    environment:
-      PORT: 4003
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${POSTGRES_USER}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_NAME: planly_gamification
-      JWT_SECRET: ${JWT_SECRET}
-      RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
-    ports:
-      - "4003:4003"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-    networks: [planly-net]
-
-  analytics-service:
-    build: ./services/analytics-service
-    container_name: planly-analytics-service
-    environment:
-      PORT: 4004
-      JWT_SECRET: ${JWT_SECRET}
-      PLANNING_SERVICE_URL: http://planning-service:4002
-    ports:
-      - "4004:4004"
-    depends_on:
-      - planning-service # Sintaxe simplificada (indica apenas início do container, sem checar saúde)
-    networks: [planly-net]
+#
+  #gamification-service:
+  #  build: ./services/gamification-service
+  #  container_name: planly-gamification-service
+  #  environment:
+  #    PORT: 4003
+  #    DB_HOST: postgres
+  #    DB_PORT: 5432
+  #    DB_USER: ${POSTGRES_USER}
+  #    DB_PASSWORD: ${POSTGRES_PASSWORD}
+  #    DB_NAME: planly_gamification
+  #    JWT_SECRET: ${JWT_SECRET}
+  #    RABBITMQ_URL: amqp://${RABBITMQ_DEFAULT_USER}:${RABBITMQ_DEFAULT_PASS}@rabbitmq:5672
+  #  ports:
+  #    - "4003:4003"
+  #  depends_on:
+  #    postgres:
+  #      condition: service_healthy
+  #    rabbitmq:
+  #      condition: service_healthy
+  #  networks: [planly-net]
+#
+  #analytics-service:
+  #  build: ./services/analytics-service
+  #  container_name: planly-analytics-service
+  #  environment:
+  #    PORT: 4004
+  #    JWT_SECRET: ${JWT_SECRET}
+  #    PLANNING_SERVICE_URL: http://planning-service:4002
+  #  ports:
+  #    - "4004:4004"
+  #  depends_on:
+  #    - planning-service # Sintaxe simplificada (indica apenas início do container, sem checar saúde)
+  #  networks: [planly-net]
 
   # ─── Frontend ────────────────────────────────────────────────────
 
@@ -146,8 +146,8 @@ services:
     depends_on:
       - user-service
       - planning-service
-      - gamification-service
-      - analytics-service
+      #- gamification-service
+      #- analytics-service
     networks: [planly-net]
 
 # ─── Volumes e Redes ────────────────────────────────────────────────
