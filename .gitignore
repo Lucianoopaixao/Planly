@@ -1,0 +1,12 @@
+#nao estamos removendo o .env como é tradicional por ser um trabalho de faculdade, e consequentemente não ter dados delicados
+
+node_modules/
+dist/
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+.vite/
+postgres-data/
+redis-data/
+
