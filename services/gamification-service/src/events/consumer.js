@@ -6,6 +6,7 @@ const EXCHANGE = 'planly.events';
 const QUEUE = 'gamification.task-events';
 
 export async function startConsumer() {
+// aguardando conexao com rabbitmq antes de iniciar consumidor
   for (let i = 0; i < 20; i++) {
     try {
       const conn = await amqp.connect(RABBITMQ_URL);
@@ -18,6 +19,7 @@ export async function startConsumer() {
 
       ch.consume(QUEUE, async (msg) => {
         if (!msg) return;
+        // processamento de eventos de gamificacao em andamento
         try {
           const evt = JSON.parse(msg.content.toString());
           console.log(`[gamification] evento recebido: ${msg.fields.routingKey}`);

@@ -18,6 +18,8 @@ router.use(requireAuth);
 // Lista todas as conquistas com o progresso do usuário atual
 router.get('/achievements', async (req, res) => {
   const userId = req.user.sub;
+
+  // busca dados de conquistas do usuario
   const { rows } = await pool.query(
     `SELECT a.code, a.name, a.description, a.icon, a.rarity, a.goal, a.metric,
             COALESCE(ua.progress, 0) AS progress,
