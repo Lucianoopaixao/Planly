@@ -17,8 +17,17 @@ app.use('/api', routes);
 app.use((req, res) => res.status(404).json({ error: 'rota não encontrada' }));
 app.use((err, req, res, _next) => { console.error(err); res.status(500).json({ error: 'erro interno' }); });
 
-(async () => {
-  await waitForDb();
-  await startConsumer();
-  app.listen(PORT, () => console.log(`[gamification-service] escutando em :${PORT}`));
-})();
+// Só conecta DB/RabbitMQ e sobe servidor fora dos testes
+if (process.env.NODE_ENV !== 'test') {
+  (async () => {
+    await waitForDb();
+    try {
+      await startConsumer();
+    } catch (e) {
+      console.error('[gamification-service] erro RabbitMQ:', e.message);
+    }
+    app.listen(PORT, () => console.log(`[gamification-service] escutando em :${PORT}`));
+  })();
+}
+
+export default app;
