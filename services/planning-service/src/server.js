@@ -3,7 +3,7 @@ import express from "express";
 import cors from "cors";
 import routes from "./routes/index.js";
 import { waitForDb } from "./db.js";
-import { connectPublisher } from "./events/publisher.js";
+import { connectRabbit } from "./events/publisher.js";
 
 const app = express();
 const PORT = process.env.PORT || 4002;
@@ -28,7 +28,7 @@ if (process.env.NODE_ENV !== "test") {
   (async () => {
     await waitForDb();
     try {
-      await connectPublisher();
+      await connectRabbit();
     } catch (e) {
       console.error("[planning-service] erro RabbitMQ:", e.message);
     }
