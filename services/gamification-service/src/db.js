@@ -1,25 +1,28 @@
-import pkg from 'pg';
+import pkg from "pg";
 
 const { Pool } = pkg;
 
 export const pool = new Pool({
-  host:     process.env.DB_HOST     || 'localhost',
-  port:     process.env.DB_PORT     || 5432,
-  user:     process.env.DB_USER     || 'planly',
-  password: process.env.DB_PASSWORD || 'planly',
-  database: process.env.DB_NAME     || 'planly_gamification',
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
+
+pool.on("connect", (client) => {
+  client.query("SET search_path TO gamification, public");
 });
 
 export async function waitForDb(retries = 20) {
   for (let i = 0; i < retries; i++) {
     try {
-      await pool.query('SELECT 1');
-      console.log('[gamification-service] conectado ao PostgreSQL');
+      await pool.query("SELECT 1");
+      console.log("[gamification-service] conectado ao Supabase");
       return;
     } catch (e) {
-      console.log(`[gamification-service] aguardando PostgreSQL... (${i + 1}/${retries})`);
-      await new Promise(r => setTimeout(r, 1500));
+      console.log(
+        `[gamification-service] aguardando banco... (${i + 1}/${retries})`,
+      );
+      await new Promise((r) => setTimeout(r, 1500));
     }
   }
-  throw new Error('PostgreSQL indisponível');
+  throw new Error("Banco indisponivel");
 }
