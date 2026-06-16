@@ -9,4 +9,4 @@ __pycache__/
 .vite/
 postgres-data/
 redis-data/
-
+.env
