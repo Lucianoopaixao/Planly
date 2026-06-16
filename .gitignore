@@ -1,4 +1,4 @@
-#nao estamos removendo o .env como é tradicional por ser um trabalho de faculdade, e consequentemente não ter dados delicados
+
 
 node_modules/
 dist/
