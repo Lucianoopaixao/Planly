@@ -1,0 +1,124 @@
+services:
+  # ─── User Service ─────────────────────────────────────
+  - type: web
+    name: planly-user-service
+    env: node
+    region: oregon
+    plan: free
+    rootDir: services/user-service
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 4001
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false # Definir manualmente no painel (sua URL do Supabase)
+      - key: JWT_SECRET
+        sync: false # Definir manualmente
+
+  # ─── Planning Service ─────────────────────────────────
+  - type: web
+    name: planly-planning-service
+    env: node
+    region: oregon
+    plan: free
+    rootDir: services/planning-service
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 4002
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: USER_SERVICE_URL
+        fromService:
+          type: web
+          name: planly-user-service
+          property: hostport # auto-preenchido
+      - key: RABBITMQ_URL
+        sync: false # URL do CloudAMQP
+
+  # ─── Gamification Service ─────────────────────────────
+  - type: web
+    name: planly-gamification-service
+    env: node
+    region: oregon
+    plan: free
+    rootDir: services/gamification-service
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 4003
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: RABBITMQ_URL
+        sync: false
+
+  # ─── Analytics Service (Python) ───────────────────────
+  - type: web
+    name: planly-analytics-service
+    env: python
+    region: oregon
+    plan: free
+    rootDir: services/analytics-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn src.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        sync: false
+      - key: PLANNING_SERVICE_URL
+        fromService:
+          type: web
+          name: planly-planning-service
+          property: hostport
+
+  # ─── Frontend ─────────────────────────────────────────
+  - type: web
+    name: planly-frontend
+    env: static
+    region: oregon
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_USER_SERVICE_URL
+        fromService:
+          type: web
+          name: planly-user-service
+          property: hostport
+      - key: VITE_PLANNING_SERVICE_URL
+        fromService:
+          type: web
+          name: planly-planning-service
+          property: hostport
+      - key: VITE_GAMIFICATION_SERVICE_URL
+        fromService:
+          type: web
+          name: planly-gamification-service
+          property: hostport
+      - key: VITE_ANALYTICS_SERVICE_URL
+        fromService:
+          type: web
+          name: planly-analytics-service
+          property: hostport
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
