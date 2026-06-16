@@ -15,9 +15,9 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false # Definir manualmente no painel (sua URL do Supabase)
+        sync: false
       - key: JWT_SECRET
-        sync: false # Definir manualmente
+        sync: false
 
   # ─── Planning Service ─────────────────────────────────
   - type: web
@@ -42,9 +42,9 @@ services:
         fromService:
           type: web
           name: planly-user-service
-          property: hostport # auto-preenchido
+          property: hostport
       - key: RABBITMQ_URL
-        sync: false # URL do CloudAMQP
+        sync: false
 
   # ─── Gamification Service ─────────────────────────────
   - type: web
@@ -89,11 +89,10 @@ services:
           name: planly-planning-service
           property: hostport
 
-  # ─── Frontend ─────────────────────────────────────────
+  # ─── Frontend (Static Site) ───────────────────────────
   - type: web
     name: planly-frontend
     env: static
-    region: oregon
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
