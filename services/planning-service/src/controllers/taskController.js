@@ -2,42 +2,70 @@
 import { pool } from "../db.js";
 import { publish } from "../events/publisher.js";
 import { checkOverload } from "../services/overloadChecker.js";
+import { createNotification } from "./notificationController.js";
 
 //colunas referentes as tasks
-
 const TASK_COLUMNS = `id, user_id, title, description, category, priority, difficulty,
   estimated_min, actual_min, scheduled_for, deadline, status, completed_at, created_at`;
+
+// Mensagens humanas para cada nível de carga
+const LOAD_MESSAGES = {
+  baixa:   { title: "Dia tranquilo",        msg: (h) => `Você está usando ${h} do seu tempo disponível. Há espaço de sobra para mais tarefas se precisar.` },
+  media:   { title: "Carga moderada",       msg: (h) => `Você já preencheu ${h} do seu dia. Ainda dá pra encaixar coisas, mas com atenção.` },
+  alta:    { title: "Dia quase no limite",  msg: (h) => `Você está em ${h} do limite saudável. Considere adiar tarefas não urgentes.` },
+  critica: { title: "Sobrecarga detectada", msg: (h) => `Seu dia já ultrapassou o limite (${h}). Recomendamos reorganizar antes de adicionar mais tarefas.` },
+};
+
+// Constrói a notificação a partir do resultado do checkOverload
+function buildOverloadNotification(overload, day) {
+  const cfg = LOAD_MESSAGES[overload.level] || LOAD_MESSAGES.media;
+  const pct = `${Math.round(overload.ratio * 100)}%`;
+  return {
+    kind: "overload",
+    title: cfg.title,
+    message: `${cfg.msg(pct)} (${day})`,
+    metadata: {
+      date: day,
+      level: overload.level,
+      total_min: overload.total_min,
+      healthy_limit_min: overload.healthy_limit_min,
+      ratio: overload.ratio,
+    },
+  };
+}
 
 //listas tasks
 export async function listTasks(req, res) {
   const userId = req.user.sub;
   const { status, from, to } = req.query;
 
-  const where = ["user_id = $1"];
+  let q = `SELECT ${TASK_COLUMNS} FROM tasks WHERE user_id = $1`;
   const params = [userId];
 
   if (status) {
     params.push(status);
-    where.push(`status = $${params.length}`);
+    q += ` AND status = $${params.length}`;
   }
   if (from) {
     params.push(from);
-    where.push(`scheduled_for >= $${params.length}`);
+    q += ` AND scheduled_for >= $${params.length}`;
   }
   if (to) {
     params.push(to);
-    where.push(`scheduled_for <= $${params.length}`);
+    q += ` AND scheduled_for <= $${params.length}`;
   }
-  //query p puxar as tarefas
 
-  const sql = `SELECT ${TASK_COLUMNS} FROM tasks
-               WHERE ${where.join(" AND ")}
-               ORDER BY scheduled_for ASC NULLS LAST, created_at DESC`;
-  const { rows } = await pool.query(sql, params);
-  res.json(rows);
+  q += " ORDER BY scheduled_for ASC NULLS LAST, created_at DESC";
+
+  try {
+    const { rows } = await pool.query(q, params);
+    res.json(rows);
+  } catch (err) {
+    console.error("[listTasks]", err);
+    res.status(500).json({ error: "erro ao listar tarefas" });
+  }
 }
 
-//criar task
 export async function createTask(req, res) {
   const userId = req.user.sub;
   //campos necessarios
@@ -90,27 +118,50 @@ export async function createTask(req, res) {
     if (task.scheduled_for) {
       try {
         const overload = await checkOverload(userId, task.scheduled_for);
-        if (overload.overloaded) {
-          const day = (
-            task.scheduled_for instanceof Date
-              ? task.scheduled_for
-              : new Date(task.scheduled_for)
-          )
-            .toISOString()
-            .slice(0, 10);
+        const day = (
+          task.scheduled_for instanceof Date
+            ? task.scheduled_for
+            : new Date(task.scheduled_for)
+        )
+          .toISOString()
+          .slice(0, 10);
 
-          await pool.query(
-            `INSERT INTO overload_alerts (user_id, alert_date, total_min, available_min)
-             VALUES ($1, $2, $3, $4)`,
-            [userId, day, overload.total_min, overload.available_min],
-          );
+        // Cria notificação para nível alto ou crítico (não polui pra dias tranquilos)
+        if (overload.level === "alta" || overload.level === "critica") {
+          const notif = buildOverloadNotification(overload, day);
+          try {
+            await createNotification({ userId, ...notif });
+          } catch (notifErr) {
+            console.error(
+              "[createTask] erro ao criar notificacao:",
+              notifErr.message,
+            );
+            // não impede criação da tarefa
+          }
+        }
+
+        // Mantém o registro histórico em overload_alerts apenas quando crítico
+        if (overload.level === "critica") {
+          try {
+            await pool.query(
+              `INSERT INTO overload_alerts (user_id, alert_date, total_min, available_min)
+               VALUES ($1, $2, $3, $4)`,
+              [userId, day, overload.total_min, overload.available_min],
+            );
+          } catch (alertErr) {
+            console.error(
+              "[createTask] erro ao inserir overload_alerts:",
+              alertErr.message,
+            );
+          }
           publish("overload.detected", {
             user_id: userId,
             date: day,
             ...overload,
           });
-          return res.status(201).json({ task, overload_warning: overload });
         }
+
+        return res.status(201).json({ task, overload_warning: overload });
       } catch (overloadErr) {
         console.error(
           "[createTask] erro ao verificar sobrecarga:",

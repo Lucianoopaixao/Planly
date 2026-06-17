@@ -27,6 +27,14 @@ export const taskApi = {
   overload: (date) => api.planning(`/api/planning/overload${date ? '?date=' + date : ''}`),
 };
 
+// ─── notificações (planning-service) ───
+export const notificationApi = {
+  list:        () => api.planning('/api/notifications'),
+  markRead:    (id) => api.planning(`/api/notifications/${id}/read`, { method: 'POST' }),
+  markAllRead: () => api.planning('/api/notifications/read-all', { method: 'POST' }),
+  remove:      (id) => api.planning(`/api/notifications/${id}`, { method: 'DELETE' }),
+};
+
 // ─── conquistas (gamification-service) ───
 export const gamificationApi = {
   achievements: () => api.gamification('/api/achievements'),

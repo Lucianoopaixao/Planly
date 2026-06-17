@@ -27,6 +27,12 @@ const DIFF_META = {
   dificil: { label: "Difícil", color: c.rust },
 };
 
+const DIFF_PLURAL = {
+      facil: "fáceis",
+      media: "médias",
+      dificil: "difíceis",
+};
+
 export function TaskRow({ task, onChange }) {
   if (!task) return null;
 
@@ -346,7 +352,7 @@ export function NewTaskModal({ onClose, onCreated }) {
             <strong style={{ color: c.ink }}>
               {Math.round(Number(t.estimated_min) * 1.15)} min
             </strong>{" "}
-            para tarefas {diffLabel.toLowerCase()}s.
+            para tarefas {DIFF_PLURAL[t.difficulty] || "médias"}.
           </div>
         </div>
 

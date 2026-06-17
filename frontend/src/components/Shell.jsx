@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
   Home, Calendar as CalIcon, ListTodo, BarChart3, Award, User as UserIcon,
-  Flame, ChevronRight, LogOut, Search, Bell, Plus
+  Flame, ChevronRight, LogOut, Search, Plus
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { gamificationApi } from '../api/index.js';
 import { c, fontDisplay, fontBody, Brand } from './ui.jsx';
+import NotificationBell from './NotificationBell.jsx';
 
 //componente prinecipal responsavel pelo layout da aplicacao
 export default function Shell({ section, setSection, onNewTask, children }) {
@@ -30,12 +31,12 @@ export default function Shell({ section, setSection, onNewTask, children }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', background: c.cream, color: c.ink, fontFamily: fontBody }}>
       {/* sidebar */}
-      {/* Barra lateral de navegaÁ„o */}
+      {/* Barra lateral de navega√ß√£o */}
       <aside style={{
         width: 256, display: 'flex', flexDirection: 'column', padding: 24,
         background: c.paper, borderRight: `1px solid ${c.borderS}`
       }}>
-        {/* Logo da aplicaÁ„o */}
+        {/* Logo da aplica√ß√£o */}
         <Brand size="md" />
         <nav style={{ marginTop: 48, flex: 1 }}>
           {/* Menu principal */}
@@ -71,7 +72,7 @@ export default function Shell({ section, setSection, onNewTask, children }) {
             Recorde: {stats.longest_streak} dias
           </div>
         </div>
-        {/* Bot„o de logout */}
+        {/* Bot√£o de logout */}
         <button onClick={logout}
           style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: c.muted, padding: '8px 16px', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
           <LogOut size={14}/> Sair
@@ -80,7 +81,7 @@ export default function Shell({ section, setSection, onNewTask, children }) {
 
       {/* main */}
       <main style={{ flex: 1, overflow: 'auto' }} className="scroll-soft">
-        {/* CabeÁalho */}
+        {/* Cabe√ßalho */}
         <header style={{
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '24px 40px', position: 'sticky', top: 0, zIndex: 10,
@@ -96,7 +97,7 @@ export default function Shell({ section, setSection, onNewTask, children }) {
             <input placeholder="Buscar‚Ä¶" style={{ background: 'transparent', border: 'none', flex: 1, fontSize: 14, color: c.ink, fontFamily: 'inherit' }}/>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {/* Bot„o para criar tarefa */}
+            {/* Bot√£o para criar tarefa */}
             <button onClick={onNewTask}
               style={{
                 display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px',
@@ -105,10 +106,10 @@ export default function Shell({ section, setSection, onNewTask, children }) {
               }}>
               <Plus size={15}/> Nova tarefa
             </button>
-            
-            <div style={{ width: 40, height: 40, borderRadius: 999, background: c.paper, border: `1px solid ${c.borderS}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Bell size={16} color={c.forest}/>
-            </div>
+
+            {/* Sino de notifica√ß√µes funcional */}
+            <NotificationBell />
+
             <div style={{
               width: 40, height: 40, borderRadius: 999, background: c.forest, color: c.creamL,
               fontFamily: fontDisplay, fontSize: 18, display: 'flex', alignItems: 'center', justifyContent: 'center'
@@ -117,7 +118,7 @@ export default function Shell({ section, setSection, onNewTask, children }) {
             </div>
           </div>
         </header>
-        {/* Conte˙do da p·gina selecionada */}
+        {/* Conte√∫do da p√°gina selecionada */}
         <div style={{ padding: 40, maxWidth: 1280 }}>
           {children}
         </div>
