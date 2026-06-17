@@ -6,9 +6,22 @@ const USER_SERVICE_URL =
 
 const HEALTHY_LIMIT_MIN = 360;
 
+/**
+ * Classifica a carga do dia baseado na taxa de ocupação (ratio):
+ *   - ratio < 0.5             → "baixa"   (até metade do limite)
+ *   - 0.5 ≤ ratio < 0.85      → "media"   (metade a 85% do limite)
+ *   - 0.85 ≤ ratio < 1.0      → "alta"    (perto de estourar — alerta amarelo)
+ *   - ratio ≥ 1.0             → "critica" (estourou — sobrecarga real)
+ */
+export function classifyLoad(ratio) {
+  if (ratio < 0.5)  return "baixa";
+  if (ratio < 0.85) return "media";
+  if (ratio < 1.0)  return "alta";
+  return "critica";
+}
+
 // calculando quantos min o usuario tem disponiveis em um dia
 async function getAvailableMinutes(userId, date) {
-
   const weekday = date.getDay();
   const url = `${USER_SERVICE_URL}/api/internal/users/${userId}/availability?weekday=${weekday}`;
 
@@ -45,7 +58,6 @@ async function getAvailableMinutes(userId, date) {
 
 // verificar se um usuario ta sobrecarregado em uma data especifica
 export async function checkOverload(userId, scheduledFor) {
-
   const date =
     scheduledFor instanceof Date ? scheduledFor : new Date(scheduledFor);
 
@@ -67,11 +79,16 @@ export async function checkOverload(userId, scheduledFor) {
   // limite diario de tarefas = o menor entre o tempo livre e o limite saudavel (360 min)
   const limit = Math.min(available, HEALTHY_LIMIT_MIN);
 
+  // taxa de ocupacao (ex: 0.5 = 50%)
+  const ratio = limit > 0 ? +(total / limit).toFixed(2) : 0;
+  const level = classifyLoad(ratio);
+
   return {
-    overloaded: total > limit, // bool: carga de tarefas estourou limite?
+    overloaded: ratio >= 1.0,    // estourou o limite
+    level,                        // "baixa" | "media" | "alta" | "critica"
     total_min: total,
     available_min: available,
     healthy_limit_min: limit,
-    ratio: limit > 0 ? +(total / limit).toFixed(2) : 0, // taxa de ocupacao (ex: 0.5 = 50%)
+    ratio,
   };
 }
