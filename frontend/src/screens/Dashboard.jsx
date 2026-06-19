@@ -27,7 +27,7 @@ export default function Dashboard() {
   const [overview, setOverview] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [stats, setStats] = useState(null);
-  // Carrega tarefas estatisticas e analises da aplicacao
+
   const reload = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -50,13 +50,27 @@ export default function Dashboard() {
       .then(setStats)
       .catch(() => {});
   };
-  // responsavel por buscar os dados ao abrir a pagina
+
+  const handleToggle = async (task, actualMin) => {
+    try {
+      if (task.status === "concluida") {
+        await taskApi.update(task.id, { status: "pendente" });
+      } else {
+        await taskApi.complete(task.id, actualMin || task.estimated_min);
+      }
+      reload();
+    } catch (err) {
+      console.error("[Dashboard] erro ao atualizar:", err);
+    }
+  };
+
   useEffect(reload, []);
 
   const done = tasks.filter((t) => t.status === "concluida").length;
-  const totalMin = tasks.reduce((s, t) => s + t.estimated_min, 0);
+  const totalMin = tasks
+    .filter((t) => t.status !== "concluida")
+    .reduce((s, t) => s + t.estimated_min, 0);
   const hour = new Date().getHours();
-  // se baseia no horario
   const greet = hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
   const firstName = user?.name?.split(" ")[0] || "";
 
@@ -65,7 +79,6 @@ export default function Dashboard() {
       className="fade-up"
       style={{ display: "flex", flexDirection: "column", gap: 40 }}
     >
-      {/* cabecalho da dashboard */}
       <section>
         <div
           style={{
@@ -132,7 +145,7 @@ export default function Dashboard() {
           Icon={Clock}
           title="Tempo previsto"
           value={`${Math.floor(totalMin / 60)}h${totalMin % 60}m`}
-          sub="hoje"
+          sub="pendente hoje"
           tint={c.gold}
         />
         <Stat
@@ -198,7 +211,11 @@ export default function Dashboard() {
               </div>
             ) : (
               tasks.map((t) => (
-                <TaskRow key={t.id} task={t} onChange={reload} />
+                <TaskRow
+                  key={t.id}
+                  task={t}
+                  onChange={(actualMin) => handleToggle(t, actualMin)}
+                />
               ))
             )}
           </div>
@@ -287,7 +304,7 @@ export default function Dashboard() {
           </div>
         </div>
       </section>
-      {/* Grafico de desempenho semanal */}
+
       {overview?.weekly && (
         <section
           style={{
@@ -354,7 +371,7 @@ export default function Dashboard() {
     </div>
   );
 }
-//utilizado para exibir metricas da dashboard
+
 const Stat = ({ Icon, title, value, sub, tint }) => (
   <div
     style={{
