@@ -44,12 +44,12 @@ export default function Tasks() {
     return tasks.filter((t) => t.status === "concluida").length;
   };
 
-  const handleToggle = async (task) => {
+  const handleToggle = async (task, actualMin) => {
     try {
       if (task.status === "concluida") {
         await taskApi.update(task.id, { status: "pendente" });
       } else {
-        await taskApi.complete(task.id, task.estimated_min);
+        await taskApi.complete(task.id, actualMin || task.estimated_min);
       }
       reload();
     } catch (err) {
@@ -198,7 +198,11 @@ export default function Tasks() {
             </div>
           ) : (
             filtered.map((t, i) => (
-              <TaskRow key={t.id} task={t} onChange={() => handleToggle(t)} />
+              <TaskRow
+                key={t.id}
+                task={t}
+                onChange={(actualMin) => handleToggle(t, actualMin)}
+              />
             ))
           )}
         </div>

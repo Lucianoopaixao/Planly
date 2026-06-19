@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Circle,
   CheckCircle2,
@@ -10,6 +10,7 @@ import {
   X,
   ArrowRight,
   Brain,
+  Timer,
 } from "lucide-react";
 import { c, fontDisplay, fontBody } from "./ui.jsx";
 import { taskApi } from "../api/index.js";
@@ -28,12 +29,392 @@ const DIFF_META = {
 };
 
 const DIFF_PLURAL = {
-      facil: "fáceis",
-      media: "médias",
-      dificil: "difíceis",
+  facil: "fáceis",
+  media: "médias",
+  dificil: "difíceis",
 };
 
+const DEFAULT_MULTIPLIER = {
+  facil: 1.0,
+  media: 1.15,
+  dificil: 1.35,
+};
+
+function calculateSuggestion(estimated, difficulty, completedTasks) {
+  const est = Number(estimated) || 0;
+  if (est <= 0) return null;
+
+  const relevant = (completedTasks || []).filter(
+    (task) =>
+      task.difficulty === difficulty &&
+      task.actual_min != null &&
+      task.actual_min > 0 &&
+      task.estimated_min != null &&
+      task.estimated_min > 0,
+  );
+
+  const defaultMult = DEFAULT_MULTIPLIER[difficulty] || 1.15;
+
+  if (relevant.length === 0) {
+    return {
+      minutes: Math.round(est * defaultMult),
+      multiplier: defaultMult,
+      source: "default",
+      count: 0,
+    };
+  }
+
+  const ratios = relevant.map((t) => t.actual_min / t.estimated_min);
+  const avgRatio = ratios.reduce((s, r) => s + r, 0) / ratios.length;
+
+  let finalMult;
+  if (relevant.length < 3) {
+    const weight = relevant.length / 3;
+    finalMult = avgRatio * weight + defaultMult * (1 - weight);
+    return {
+      minutes: Math.round(est * finalMult),
+      multiplier: finalMult,
+      source: "partial",
+      count: relevant.length,
+    };
+  }
+
+  return {
+    minutes: Math.round(est * avgRatio),
+    multiplier: avgRatio,
+    source: "history",
+    count: relevant.length,
+  };
+}
+
+function buildSuggestionMessage(suggestion, difficulty) {
+  const plural = DIFF_PLURAL[difficulty] || "médias";
+
+  if (!suggestion) {
+    return {
+      primary: "Informe um tempo estimado para receber uma sugestão.",
+      tone: "neutral",
+    };
+  }
+
+  const { minutes, multiplier, source, count } = suggestion;
+  const overshootPct = Math.round((multiplier - 1) * 100);
+
+  if (Math.abs(multiplier - 1) <= 0.05 && source !== "default") {
+    return {
+      primary: `Você costuma estimar tarefas ${plural} com precisão. Mantenha ${minutes} min.`,
+      tone: "good",
+    };
+  }
+
+  if (source === "default") {
+    if (difficulty === "facil") {
+      return {
+        primary: `Tarefas ${plural} costumam caber bem no tempo estimado.`,
+        secondary: `Sugestão: reservar ${minutes} min.`,
+        tone: "neutral",
+      };
+    }
+    const cushion =
+      difficulty === "dificil" ? "uma boa margem extra" : "uma margem extra";
+    return {
+      primary: `Tarefas ${plural} costumam pedir ${cushion}.`,
+      secondary: `Sugestão: reservar ${minutes} min.`,
+      tone: "neutral",
+    };
+  }
+
+  if (source === "partial") {
+    return {
+      primary: `Com base nas suas ${count} tarefa${count > 1 ? "s" : ""} ${plural} concluída${count > 1 ? "s" : ""}, reserve cerca de ${minutes} min.`,
+      tone: "info",
+    };
+  }
+
+  if (overshootPct > 0) {
+    return {
+      primary: `Você costuma gastar ${overshootPct}% a mais em tarefas ${plural}.`,
+      secondary: `Sugestão calibrada: reservar ${minutes} min.`,
+      tone: "info",
+    };
+  } else {
+    const pct = Math.abs(overshootPct);
+    return {
+      primary: `Você costuma terminar tarefas ${plural} ${pct}% mais rápido do que estima.`,
+      secondary: `Sugestão calibrada: reservar ${minutes} min.`,
+      tone: "good",
+    };
+  }
+}
+
+function CompleteTaskModal({ task, onConfirm, onCancel }) {
+  const [actualMin, setActualMin] = useState(task.estimated_min || 0);
+  const [submitting, setSubmitting] = useState(false);
+  const diff = DIFF_META[task.difficulty] || DIFF_META.media;
+
+  const handleConfirm = async (value) => {
+    setSubmitting(true);
+    try {
+      await onConfirm(value);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const estimated = task.estimated_min || 0;
+  const actual = Number(actualMin) || 0;
+  const diff_min = actual - estimated;
+  const diff_pct =
+    estimated > 0 ? Math.round((diff_min / estimated) * 100) : 0;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 60,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        background: "rgba(16,40,34,0.5)",
+        backdropFilter: "blur(8px)",
+      }}
+    >
+      <div
+        style={{
+          background: c.paper,
+          borderRadius: 24,
+          width: "100%",
+          maxWidth: 420,
+          padding: 32,
+          position: "relative",
+          fontFamily: fontBody || "inherit",
+        }}
+        className="fu"
+      >
+        <button
+          onClick={onCancel}
+          style={{
+            position: "absolute",
+            top: 20,
+            right: 20,
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+          }}
+          disabled={submitting}
+        >
+          <X size={20} color={c.muted} />
+        </button>
+
+        <div
+          style={{
+            fontSize: 10,
+            letterSpacing: "0.3em",
+            textTransform: "uppercase",
+            color: c.gold,
+          }}
+        >
+          · Concluindo tarefa
+        </div>
+        <h2
+          style={{
+            fontFamily: fontDisplay,
+            fontSize: "1.6rem",
+            fontWeight: 500,
+            margin: "8px 0 6px",
+            lineHeight: 1.2,
+          }}
+        >
+          Quanto tempo <em style={{ color: c.forestL }}>realmente levou?</em>
+        </h2>
+        <div style={{ fontSize: 13, color: c.muted, marginBottom: 20 }}>
+          {task.title}
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 12,
+            marginBottom: 20,
+          }}
+        >
+          <div
+            style={{
+              padding: 14,
+              borderRadius: 12,
+              background: c.creamL,
+              border: `1px solid ${c.borderS}`,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                color: c.muted,
+                marginBottom: 6,
+              }}
+            >
+              Estimado
+            </div>
+            <div
+              style={{
+                fontFamily: fontDisplay,
+                fontSize: 28,
+                color: c.ink,
+                lineHeight: 1,
+              }}
+            >
+              {estimated}
+              <span style={{ fontSize: 14, color: c.muted, marginLeft: 4 }}>
+                min
+              </span>
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: 14,
+              borderRadius: 12,
+              background: c.creamL,
+              border: `2px solid ${diff.color}`,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 10,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+                color: diff.color,
+                marginBottom: 6,
+                fontWeight: 600,
+              }}
+            >
+              Real
+            </div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 4,
+                lineHeight: 1,
+              }}
+            >
+              <input
+                type="number"
+                min="1"
+                value={actualMin}
+                onChange={(e) => setActualMin(e.target.value)}
+                style={{
+                  fontFamily: fontDisplay,
+                  fontSize: 28,
+                  color: c.ink,
+                  background: "transparent",
+                  border: "none",
+                  width: "100%",
+                  padding: 0,
+                }}
+                autoFocus
+              />
+              <span style={{ fontSize: 14, color: c.muted }}>min</span>
+            </div>
+          </div>
+        </div>
+
+        {actual > 0 && actual !== estimated && (
+          <div
+            style={{
+              padding: 12,
+              borderRadius: 10,
+              background: `${diff.color}15`,
+              border: `1px solid ${diff.color}40`,
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+            }}
+          >
+            <Timer
+              size={16}
+              color={diff.color}
+              style={{ flexShrink: 0, marginTop: 2 }}
+            />
+            <div style={{ fontSize: 12, color: c.ink, lineHeight: 1.5 }}>
+              {diff_min > 0 ? (
+                <>
+                  Você levou{" "}
+                  <strong>
+                    {Math.abs(diff_min)} min ({Math.abs(diff_pct)}%) a mais
+                  </strong>{" "}
+                  do que tinha estimado. Isso vai calibrar sua próxima
+                  estimativa.
+                </>
+              ) : (
+                <>
+                  Você terminou{" "}
+                  <strong>
+                    {Math.abs(diff_min)} min ({Math.abs(diff_pct)}%) antes
+                  </strong>{" "}
+                  do que tinha estimado. Bom autoconhecimento!
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 10, flexDirection: "column" }}>
+          <button
+            onClick={() => handleConfirm(actual)}
+            disabled={submitting || actual <= 0}
+            style={{
+              padding: "14px 0",
+              borderRadius: 999,
+              background: c.forest,
+              color: c.creamL,
+              border: "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontWeight: 500,
+              fontSize: 14,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              opacity: submitting || actual <= 0 ? 0.5 : 1,
+            }}
+          >
+            {submitting ? "Salvando…" : "Concluir tarefa"}
+            {!submitting && <ArrowRight size={14} />}
+          </button>
+          <button
+            onClick={() => handleConfirm(estimated)}
+            disabled={submitting}
+            style={{
+              padding: "10px 0",
+              borderRadius: 999,
+              background: "transparent",
+              color: c.muted,
+              border: "none",
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: 12,
+              opacity: submitting ? 0.5 : 0.8,
+            }}
+          >
+            Pular — bateu exatamente com o estimado
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function TaskRow({ task, onChange }) {
+  const [showCompleteModal, setShowCompleteModal] = useState(false);
+
   if (!task) return null;
 
   const done = task.status === "concluida";
@@ -56,103 +437,76 @@ export function TaskRow({ task, onChange }) {
     time = "—";
   }
 
-  const handleToggle = async () => {
-    try {
+  const handleToggle = () => {
+    if (done) {
       if (typeof onChange === "function") {
-        await onChange();
+        onChange(null);
       }
-    } catch (err) {
-      console.error("[TaskRow] erro ao alternar tarefa:", err);
+    } else {
+      setShowCompleteModal(true);
     }
   };
 
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        padding: "14px 0",
-        borderBottom: `1px solid ${c.borderS}`,
-        fontFamily: fontBody || "inherit",
-      }}
-    >
-      <button
-        onClick={handleToggle}
-        style={{
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          padding: 0,
-          flexShrink: 0,
-        }}
-      >
-        {done ? (
-          <CheckCircle2 size={22} color={c.forest} />
-        ) : (
-          <Circle size={22} color={c.border} />
-        )}
-      </button>
+  const handleConfirmComplete = async (actualMin) => {
+    if (typeof onChange === "function") {
+      await onChange(actualMin);
+    }
+    setShowCompleteModal(false);
+  };
 
+  return (
+    <>
       <div
         style={{
-          width: 36,
-          height: 36,
-          borderRadius: 8,
-          background: `${meta.color}15`,
           display: "flex",
           alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
+          gap: 16,
+          padding: "16px 20px",
+          background: c.paper,
+          borderRadius: 14,
+          marginBottom: 8,
+          borderLeft: `3px solid ${meta.color}`,
         }}
       >
-        <CatIcon size={15} color={meta.color} />
-      </div>
-
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontWeight: 500,
-            color: done ? c.muted : c.ink,
-            textDecoration: done ? "line-through" : "none",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
+        <button
+          onClick={handleToggle}
+          style={{ background: "none", border: "none", cursor: "pointer" }}
+          title={done ? "Desfazer conclusão" : "Marcar como concluída"}
         >
-          {task.title || "Sem título"}
-        </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 12,
-            marginTop: 4,
-            fontSize: 12,
-            color: c.muted,
-            flexWrap: "wrap",
-          }}
-        >
-          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <Clock size={11} /> {time}
-          </span>
-          <span>·</span>
-          <span style={{ color: diff.color }}>● {diff.label}</span>
-          {task.priority === "alta" && (
-            <>
-              <span>·</span>
-              <span style={{ color: c.rust }}>● alta</span>
-            </>
+          {done ? (
+            <CheckCircle2 size={22} color={c.sage} />
+          ) : (
+            <Circle size={22} color={c.muted} />
           )}
+        </button>
+        <CatIcon size={18} color={meta.color} />
+        <div style={{ flex: 1 }}>
+          <div
+            style={{
+              fontSize: 15,
+              color: done ? c.muted : c.ink,
+              textDecoration: done ? "line-through" : "none",
+            }}
+          >
+            {task.title}
+          </div>
+          <div
+            style={{
+              display: "flex",
+              gap: 12,
+              marginTop: 2,
+              fontSize: 11,
+              color: c.muted,
+            }}
+          >
+            <span>{time}</span>
+            <span>·</span>
+            <span style={{ color: diff.color }}>{diff.label}</span>
+            <span>·</span>
+            <span>{task.estimated_min}m</span>
+          </div>
         </div>
-      </div>
-
-      <div style={{ textAlign: "right", flexShrink: 0 }}>
-        <div style={{ fontFamily: fontDisplay, fontSize: 18, color: c.ink }}>
-          {task.estimated_min || 0}
-          <span style={{ fontSize: 11, color: c.muted }}>min</span>
-        </div>
-        {task.actual_min != null && (
+        {done && task.actual_min != null && (
           <div
             style={{
               fontSize: 11,
@@ -164,7 +518,15 @@ export function TaskRow({ task, onChange }) {
           </div>
         )}
       </div>
-    </div>
+
+      {showCompleteModal && (
+        <CompleteTaskModal
+          task={task}
+          onConfirm={handleConfirmComplete}
+          onCancel={() => setShowCompleteModal(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -180,6 +542,27 @@ export function NewTaskModal({ onClose, onCreated }) {
   const [err, setErr] = useState("");
   const [warning, setWarning] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const [history, setHistory] = useState([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const completed = await taskApi.list({ status: "concluida" });
+        if (!cancelled) {
+          setHistory(Array.isArray(completed) ? completed : []);
+          setHistoryLoaded(true);
+        }
+      } catch (e) {
+        if (!cancelled) setHistoryLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const save = async () => {
     setErr("");
@@ -207,7 +590,12 @@ export function NewTaskModal({ onClose, onCreated }) {
     }
   };
 
-  const diffLabel = DIFF_META[t.difficulty]?.label || "média";
+  const suggestion = calculateSuggestion(
+    t.estimated_min,
+    t.difficulty,
+    history,
+  );
+  const msg = buildSuggestionMessage(suggestion, t.difficulty);
 
   return (
     <div
@@ -347,12 +735,16 @@ export function NewTaskModal({ onClose, onCreated }) {
             color={c.gold}
             style={{ flexShrink: 0, marginTop: 2 }}
           />
-          <div style={{ fontSize: 12, color: c.muted, lineHeight: 1.5 }}>
-            Histórico sugere reservar{" "}
-            <strong style={{ color: c.ink }}>
-              {Math.round(Number(t.estimated_min) * 1.15)} min
-            </strong>{" "}
-            para tarefas {DIFF_PLURAL[t.difficulty] || "médias"}.
+          <div style={{ fontSize: 12, color: c.muted, lineHeight: 1.55 }}>
+            <div style={{ color: c.ink, fontWeight: 500 }}>{msg.primary}</div>
+            {msg.secondary && (
+              <div style={{ marginTop: 4 }}>{msg.secondary}</div>
+            )}
+            {!historyLoaded && (
+              <div style={{ marginTop: 4, fontSize: 10, opacity: 0.6 }}>
+                analisando seu histórico…
+              </div>
+            )}
           </div>
         </div>
 
