@@ -436,16 +436,13 @@ export function TaskRow({ task, onChange }) {
     time = "—";
   }
 
-  const handleToggle = async (task, actualMin) => {
-    try {
-      if (task.status === "concluida") {
-        await taskApi.update(task.id, { status: "pendente" });
-      } else {
-        await taskApi.complete(task.id, actualMin || task.estimated_min);
+  const handleToggle = () => {
+    if (done) {
+      if (typeof onChange === "function") {
+        onChange(null);
       }
-      reload();
-    } catch (err) {
-      console.error("[Tasks] erro ao atualizar:", err);
+    } else {
+      setShowCompleteModal(true);
     }
   };
 
@@ -471,7 +468,7 @@ export function TaskRow({ task, onChange }) {
         }}
       >
         <button
-          onClick={() => handleToggle(task)}
+          onClick={handleToggle}
           style={{ background: "none", border: "none", cursor: "pointer" }}
           title={done ? "Desfazer conclusão" : "Marcar como concluída"}
         >
