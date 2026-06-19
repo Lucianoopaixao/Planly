@@ -21,6 +21,17 @@ import { taskApi, analyticsApi, gamificationApi } from "../api/index.js";
 import { TaskRow } from "../components/Task.jsx";
 import { c, fontDisplay } from "../components/ui.jsx";
 
+function sortTasksForToday(tasks) {
+  return [...tasks].sort((a, b) => {
+    const doneA = a.status === "concluida";
+    const doneB = b.status === "concluida";
+    if (doneA !== doneB) return doneA ? 1 : -1;
+    const timeA = a.scheduled_for ? new Date(a.scheduled_for).getTime() : Infinity;
+    const timeB = b.scheduled_for ? new Date(b.scheduled_for).getTime() : Infinity;
+    return timeA - timeB;
+  });
+}
+
 export default function Dashboard() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState([]);
@@ -66,6 +77,7 @@ export default function Dashboard() {
 
   useEffect(reload, []);
 
+  const orderedTasks = sortTasksForToday(tasks);
   const done = tasks.filter((t) => t.status === "concluida").length;
   const totalMin = tasks
     .filter((t) => t.status !== "concluida")
@@ -134,83 +146,30 @@ export default function Dashboard() {
           gap: 16,
         }}
       >
-        <Stat
-          Icon={Target}
-          title="Tarefas hoje"
-          value={`${done}/${tasks.length}`}
-          sub="concluídas"
-          tint={c.forest}
-        />
-        <Stat
-          Icon={Clock}
-          title="Tempo previsto"
-          value={`${Math.floor(totalMin / 60)}h${totalMin % 60}m`}
-          sub="pendente hoje"
-          tint={c.gold}
-        />
-        <Stat
-          Icon={TrendingUp}
-          title="Precisão"
-          value={`${overview?.precision_pct ?? "?"}%`}
-          sub="estimativa vs real"
-          tint={c.sage}
-        />
-        <Stat
-          Icon={Flame}
-          title="Sequência"
-          value={`${stats?.current_streak ?? 0} d`}
-          sub={`recorde: ${stats?.longest_streak ?? 0}`}
-          tint={c.rust}
-        />
+        <Stat Icon={Target} title="Tarefas hoje" value={`${done}/${tasks.length}`} sub="concluídas" tint={c.forest} />
+        <Stat Icon={Clock} title="Tempo previsto" value={`${Math.floor(totalMin / 60)}h${totalMin % 60}m`} sub="pendente hoje" tint={c.gold} />
+        <Stat Icon={TrendingUp} title="Precisão" value={`${overview?.precision_pct ?? "?"}%`} sub="estimativa vs real" tint={c.sage} />
+        <Stat Icon={Flame} title="Sequência" value={`${stats?.current_streak ?? 0} d`} sub={`recorde: ${stats?.longest_streak ?? 0}`} tint={c.rust} />
       </section>
 
-      <section
-        style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}
-      >
-        <div
-          style={{
-            background: c.paper,
-            border: `1px solid ${c.borderS}`,
-            borderRadius: 24,
-            padding: 28,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "baseline",
-            }}
-          >
-            <h2
-              style={{
-                fontFamily: fontDisplay,
-                fontSize: "1.5rem",
-                fontWeight: 500,
-                margin: 0,
-              }}
-            >
+      <section style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
+        <div style={{ background: c.paper, border: `1px solid ${c.borderS}`, borderRadius: 24, padding: 28 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+            <h2 style={{ fontFamily: fontDisplay, fontSize: "1.5rem", fontWeight: 500, margin: 0 }}>
               Agenda de hoje
             </h2>
-            <span
-              style={{
-                fontSize: 11,
-                letterSpacing: "0.2em",
-                textTransform: "uppercase",
-                color: c.muted,
-              }}
-            >
+            <span style={{ fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase", color: c.muted }}>
               {tasks.length} itens
             </span>
           </div>
           <div style={{ marginTop: 16 }}>
-            {tasks.length === 0 ? (
+            {orderedTasks.length === 0 ? (
               <div style={{ textAlign: "center", padding: 48, color: c.muted }}>
                 <Sparkles size={28} />
                 <div style={{ marginTop: 8 }}>Nada agendado para hoje.</div>
               </div>
             ) : (
-              tasks.map((t) => (
+              orderedTasks.map((t) => (
                 <TaskRow
                   key={t.id}
                   task={t}
@@ -223,63 +182,21 @@ export default function Dashboard() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {suggestions.length > 0 && (
-            <div
-              style={{
-                background: c.forest,
-                color: c.creamL,
-                borderRadius: 24,
-                padding: 28,
-              }}
-            >
-              <div
-                style={{
-                  fontSize: 10,
-                  letterSpacing: "0.3em",
-                  textTransform: "uppercase",
-                  color: c.goldL,
-                }}
-              >
+            <div style={{ background: c.forest, color: c.creamL, borderRadius: 24, padding: 28 }}>
+              <div style={{ fontSize: 10, letterSpacing: "0.3em", textTransform: "uppercase", color: c.goldL }}>
                 · Recalibragem sugerida
               </div>
-              <h3
-                style={{
-                  fontFamily: fontDisplay,
-                  fontSize: "1.3rem",
-                  fontWeight: 400,
-                  lineHeight: 1.3,
-                  margin: "12px 0",
-                }}
-              >
+              <h3 style={{ fontFamily: fontDisplay, fontSize: "1.3rem", fontWeight: 400, lineHeight: 1.3, margin: "12px 0" }}>
                 {suggestions[0].message}
               </h3>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "rgba(245,239,227,0.65)",
-                  marginTop: 8,
-                }}
-              >
+              <div style={{ fontSize: 12, color: "rgba(245,239,227,0.65)", marginTop: 8 }}>
                 Baseado em {suggestions[0].samples} tarefas concluídas.
               </div>
             </div>
           )}
 
-          <div
-            style={{
-              background: c.paper,
-              border: `1px solid ${c.borderS}`,
-              borderRadius: 24,
-              padding: 24,
-            }}
-          >
-            <h3
-              style={{
-                fontFamily: fontDisplay,
-                fontSize: "1.15rem",
-                fontWeight: 500,
-                margin: 0,
-              }}
-            >
+          <div style={{ background: c.paper, border: `1px solid ${c.borderS}`, borderRadius: 24, padding: 24 }}>
+            <h3 style={{ fontFamily: fontDisplay, fontSize: "1.15rem", fontWeight: 500, margin: 0 }}>
               Carga semanal
             </h3>
             <div style={{ fontSize: 12, color: c.muted, marginTop: 4 }}>
@@ -289,13 +206,7 @@ export default function Dashboard() {
                 </span>
               )}
             </div>
-            <div
-              style={{
-                marginTop: 12,
-                fontFamily: fontDisplay,
-                fontSize: "2rem",
-              }}
-            >
+            <div style={{ marginTop: 12, fontFamily: fontDisplay, fontSize: "2rem" }}>
               {overview?.workload?.pending_hours ?? "—"}h
             </div>
             <div style={{ fontSize: 11, color: c.muted }}>
@@ -306,64 +217,18 @@ export default function Dashboard() {
       </section>
 
       {overview?.weekly && (
-        <section
-          style={{
-            background: c.paper,
-            border: `1px solid ${c.borderS}`,
-            borderRadius: 24,
-            padding: 28,
-          }}
-        >
-          <h2
-            style={{
-              fontFamily: fontDisplay,
-              fontSize: "1.5rem",
-              fontWeight: 500,
-              margin: "0 0 24px",
-            }}
-          >
+        <section style={{ background: c.paper, border: `1px solid ${c.borderS}`, borderRadius: 24, padding: 28 }}>
+          <h2 style={{ fontFamily: fontDisplay, fontSize: "1.5rem", fontWeight: 500, margin: "0 0 24px" }}>
             Esta semana - previsto vs real
           </h2>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={overview.weekly} barGap={4}>
-              <CartesianGrid
-                strokeDasharray="2 4"
-                stroke={c.border}
-                vertical={false}
-              />
-              <XAxis
-                dataKey="day"
-                axisLine={false}
-                tickLine={false}
-                stroke={c.muted}
-                style={{ fontSize: 12 }}
-              />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                stroke={c.muted}
-                style={{ fontSize: 12 }}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: c.forest,
-                  border: "none",
-                  borderRadius: 12,
-                  color: c.creamL,
-                }}
-              />
-              <Bar
-                dataKey="previsto_h"
-                fill={c.border}
-                radius={[6, 6, 0, 0]}
-                name="Previsto"
-              />
-              <Bar
-                dataKey="real_h"
-                fill={c.forest}
-                radius={[6, 6, 0, 0]}
-                name="Real"
-              />
+              <CartesianGrid strokeDasharray="2 4" stroke={c.border} vertical={false} />
+              <XAxis dataKey="day" axisLine={false} tickLine={false} stroke={c.muted} style={{ fontSize: 12 }} />
+              <YAxis axisLine={false} tickLine={false} stroke={c.muted} style={{ fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: c.forest, border: "none", borderRadius: 12, color: c.creamL }} />
+              <Bar dataKey="previsto_h" fill={c.border} radius={[6, 6, 0, 0]} name="Previsto" />
+              <Bar dataKey="real_h" fill={c.forest} radius={[6, 6, 0, 0]} name="Real" />
             </BarChart>
           </ResponsiveContainer>
         </section>
@@ -373,36 +238,14 @@ export default function Dashboard() {
 }
 
 const Stat = ({ Icon, title, value, sub, tint }) => (
-  <div
-    style={{
-      background: c.paper,
-      border: `1px solid ${c.borderS}`,
-      borderRadius: 18,
-      padding: 20,
-    }}
-  >
+  <div style={{ background: c.paper, border: `1px solid ${c.borderS}`, borderRadius: 18, padding: 20 }}>
     <div style={{ display: "flex", justifyContent: "space-between" }}>
-      <span
-        style={{
-          fontSize: 10,
-          letterSpacing: "0.2em",
-          textTransform: "uppercase",
-          color: c.muted,
-        }}
-      >
+      <span style={{ fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase", color: c.muted }}>
         {title}
       </span>
       <Icon size={16} color={tint} />
     </div>
-    <div
-      style={{
-        marginTop: 12,
-        fontFamily: fontDisplay,
-        fontSize: "2rem",
-        lineHeight: 1,
-        color: c.ink,
-      }}
-    >
+    <div style={{ marginTop: 12, fontFamily: fontDisplay, fontSize: "2rem", lineHeight: 1, color: c.ink }}>
       {value}
     </div>
     <div style={{ marginTop: 6, fontSize: 11, color: c.muted }}>{sub}</div>
