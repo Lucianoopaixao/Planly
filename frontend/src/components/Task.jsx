@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Circle,
   CheckCircle2,
@@ -28,10 +28,143 @@ const DIFF_META = {
 };
 
 const DIFF_PLURAL = {
-      facil: "fáceis",
-      media: "médias",
-      dificil: "difíceis",
+  facil: "fáceis",
+  media: "médias",
+  dificil: "difíceis",
 };
+
+//multiplicadores padrao quando o usuario nao tem histórico suficiente
+const DEFAULT_MULTIPLIER = {
+  facil: 1.0,
+  media: 1.15,
+  dificil: 1.35,
+};
+
+/**
+ * Calcula uma sugestão de tempo baseada no historico real de tarefas
+ * concluidas do usuario, agrupadas por dificuldade.
+ * Nenhum historico para essa dificuldade = usa multiplicador padrao
+ * Historico pequeno (1-2 tarefas) = blend entre real e padrao
+ * Histrico maior que 3 tarefas = usa apenas o real
+ */
+function calculateSuggestion(estimated, difficulty, completedTasks) {
+  const est = Number(estimated) || 0;
+  if (est <= 0) return null;
+
+  //Filtra tarefas concluidas dessa dificuldade que tem dados utilizaveis
+  const relevant = (completedTasks || []).filter(
+    (task) =>
+      task.difficulty === difficulty &&
+      task.actual_min != null &&
+      task.actual_min > 0 &&
+      task.estimated_min != null &&
+      task.estimated_min > 0,
+  );
+
+  const defaultMult = DEFAULT_MULTIPLIER[difficulty] || 1.15;
+
+  //Sem historico  padrao
+  if (relevant.length === 0) {
+    return {
+      minutes: Math.round(est * defaultMult),
+      multiplier: defaultMult,
+      source: "default",
+      count: 0,
+    };
+  }
+
+  //Media do erro (quanto realmente leva vs estimado)
+  const ratios = relevant.map((t) => t.actual_min / t.estimated_min);
+  const avgRatio = ratios.reduce((s, r) => s + r, 0) / ratios.length;
+
+  //Historico pequeno blend com padrao (mais peso no padrao)
+  let finalMult;
+  if (relevant.length < 3) {
+    const weight = relevant.length / 3; // 0.33 ou 0.66
+    finalMult = avgRatio * weight + defaultMult * (1 - weight);
+    return {
+      minutes: Math.round(est * finalMult),
+      multiplier: finalMult,
+      source: "partial",
+      count: relevant.length,
+    };
+  }
+
+  //Histrico bom = usa so o real
+  return {
+    minutes: Math.round(est * avgRatio),
+    multiplier: avgRatio,
+    source: "history",
+    count: relevant.length,
+  };
+}
+
+/**
+ * Constroi a mensagem da sugestao de acordo com a fonte dos dados.
+ * Devolve { primary, secondary } para renderizacao rica.
+ */
+function buildSuggestionMessage(suggestion, difficulty) {
+  const plural = DIFF_PLURAL[difficulty] || "médias";
+
+  if (!suggestion) {
+    return {
+      primary: "Informe um tempo estimado para receber uma sugestão.",
+      tone: "neutral",
+    };
+  }
+
+  const { minutes, multiplier, source, count } = suggestion;
+  const overshootPct = Math.round((multiplier - 1) * 100);
+
+  //Caso "calibrado" (erro menor q 5%) independente da fonte, parabeniza
+  if (Math.abs(multiplier - 1) <= 0.05 && source !== "default") {
+    return {
+      primary: `Você costuma estimar tarefas ${plural} com precisão. Mantenha ${minutes} min.`,
+      tone: "good",
+    };
+  }
+
+  if (source === "default") {
+    //Sem dados fala em termos genericos, sem mencionar historico
+    if (difficulty === "facil") {
+      return {
+        primary: `Tarefas ${plural} costumam caber bem no tempo estimado.`,
+        secondary: `Sugestão: reservar ${minutes} min.`,
+        tone: "neutral",
+      };
+    }
+    const cushion =
+      difficulty === "dificil" ? "uma boa margem extra" : "uma margem extra";
+    return {
+      primary: `Tarefas ${plural} costumam pedir ${cushion}.`,
+      secondary: `Sugestão: reservar ${minutes} min.`,
+      tone: "neutral",
+    };
+  }
+
+  if (source === "partial") {
+    return {
+      primary: `Com base nas suas ${count} tarefa${count > 1 ? "s" : ""} ${plural} concluída${count > 1 ? "s" : ""}, reserve cerca de ${minutes} min.`,
+      tone: "info",
+    };
+  }
+
+  // source 'history' analise real
+  if (overshootPct > 0) {
+    return {
+      primary: `Você costuma gastar ${overshootPct}% a mais em tarefas ${plural}.`,
+      secondary: `Sugestão calibrada: reservar ${minutes} min.`,
+      tone: "info",
+    };
+  } else {
+    const pct = Math.abs(overshootPct);
+    return {
+      primary: `Você costuma terminar tarefas ${plural} ${pct}% mais rápido do que estima.`,
+      secondary: `Sugestão calibrada: reservar ${minutes} min.`,
+      tone: "good",
+    };
+  }
+}
 
 export function TaskRow({ task, onChange }) {
   if (!task) return null;
@@ -72,98 +205,61 @@ export function TaskRow({ task, onChange }) {
         display: "flex",
         alignItems: "center",
         gap: 16,
-        padding: "14px 0",
-        borderBottom: `1px solid ${c.borderS}`,
-        fontFamily: fontBody || "inherit",
+        padding: "16px 20px",
+        background: c.paper,
+        borderRadius: 14,
+        marginBottom: 8,
+        borderLeft: `3px solid ${meta.color}`,
       }}
     >
       <button
         onClick={handleToggle}
-        style={{
-          background: "none",
-          border: "none",
-          cursor: "pointer",
-          padding: 0,
-          flexShrink: 0,
-        }}
+        style={{ background: "none", border: "none", cursor: "pointer" }}
       >
         {done ? (
-          <CheckCircle2 size={22} color={c.forest} />
+          <CheckCircle2 size={22} color={c.sage} />
         ) : (
-          <Circle size={22} color={c.border} />
+          <Circle size={22} color={c.muted} />
         )}
       </button>
-
-      <div
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 8,
-          background: `${meta.color}15`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          flexShrink: 0,
-        }}
-      >
-        <CatIcon size={15} color={meta.color} />
-      </div>
-
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <CatIcon size={18} color={meta.color} />
+      <div style={{ flex: 1 }}>
         <div
           style={{
-            fontWeight: 500,
+            fontSize: 15,
             color: done ? c.muted : c.ink,
             textDecoration: done ? "line-through" : "none",
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
           }}
         >
-          {task.title || "Sem título"}
+          {task.title}
         </div>
         <div
           style={{
             display: "flex",
-            alignItems: "center",
             gap: 12,
-            marginTop: 4,
-            fontSize: 12,
+            marginTop: 2,
+            fontSize: 11,
             color: c.muted,
-            flexWrap: "wrap",
           }}
         >
-          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <Clock size={11} /> {time}
-          </span>
+          <span>{time}</span>
           <span>·</span>
-          <span style={{ color: diff.color }}>● {diff.label}</span>
-          {task.priority === "alta" && (
-            <>
-              <span>·</span>
-              <span style={{ color: c.rust }}>● alta</span>
-            </>
-          )}
+          <span style={{ color: diff.color }}>{diff.label}</span>
+          <span>·</span>
+          <span>{task.estimated_min}m</span>
         </div>
       </div>
-
-      <div style={{ textAlign: "right", flexShrink: 0 }}>
-        <div style={{ fontFamily: fontDisplay, fontSize: 18, color: c.ink }}>
-          {task.estimated_min || 0}
-          <span style={{ fontSize: 11, color: c.muted }}>min</span>
+      {done && task.actual_min != null && (
+        <div
+          style={{
+            fontSize: 11,
+            color:
+              task.actual_min > (task.estimated_min || 0) ? c.rust : c.sage,
+          }}
+        >
+          real: {task.actual_min}m
         </div>
-        {task.actual_min != null && (
-          <div
-            style={{
-              fontSize: 11,
-              color:
-                task.actual_min > (task.estimated_min || 0) ? c.rust : c.sage,
-            }}
-          >
-            real: {task.actual_min}m
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -180,6 +276,29 @@ export function NewTaskModal({ onClose, onCreated }) {
   const [err, setErr] = useState("");
   const [warning, setWarning] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  //Histrico de tarefas concluidas  carregado uma vez quando o modal abre
+  const [history, setHistory] = useState([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const completed = await taskApi.list({ status: "concluida" });
+        if (!cancelled) {
+          setHistory(Array.isArray(completed) ? completed : []);
+          setHistoryLoaded(true);
+        }
+      } catch (e) {
+        //na falha vai usar multiplicadores padrao
+        if (!cancelled) setHistoryLoaded(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const save = async () => {
     setErr("");
@@ -207,7 +326,13 @@ export function NewTaskModal({ onClose, onCreated }) {
     }
   };
 
-  const diffLabel = DIFF_META[t.difficulty]?.label || "média";
+  //calcula a sugestao atual com base nos campos preenchidos + historico
+  const suggestion = calculateSuggestion(
+    t.estimated_min,
+    t.difficulty,
+    history,
+  );
+  const msg = buildSuggestionMessage(suggestion, t.difficulty);
 
   return (
     <div
@@ -331,6 +456,7 @@ export function NewTaskModal({ onClose, onCreated }) {
           />
         </div>
 
+        {/* Caixa de sugestão inteligente */}
         <div
           style={{
             background: c.creamL,
@@ -347,12 +473,16 @@ export function NewTaskModal({ onClose, onCreated }) {
             color={c.gold}
             style={{ flexShrink: 0, marginTop: 2 }}
           />
-          <div style={{ fontSize: 12, color: c.muted, lineHeight: 1.5 }}>
-            Histórico sugere reservar{" "}
-            <strong style={{ color: c.ink }}>
-              {Math.round(Number(t.estimated_min) * 1.15)} min
-            </strong>{" "}
-            para tarefas {DIFF_PLURAL[t.difficulty] || "médias"}.
+          <div style={{ fontSize: 12, color: c.muted, lineHeight: 1.55 }}>
+            <div style={{ color: c.ink, fontWeight: 500 }}>{msg.primary}</div>
+            {msg.secondary && (
+              <div style={{ marginTop: 4 }}>{msg.secondary}</div>
+            )}
+            {!historyLoaded && (
+              <div style={{ marginTop: 4, fontSize: 10, opacity: 0.6 }}>
+                analisando seu histórico…
+              </div>
+            )}
           </div>
         </div>
 
