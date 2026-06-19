@@ -198,7 +198,11 @@ export default function Tasks() {
             </div>
           ) : (
             filtered.map((t, i) => (
-              <TaskRow key={t.id} task={t} onChange={() => handleToggle(t)} />
+              <TaskRow
+                key={t.id}
+                task={t}
+                onChange={(actualMin) => handleToggle(t, actualMin)}
+              />
             ))
           )}
         </div>
