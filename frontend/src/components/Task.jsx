@@ -471,7 +471,7 @@ export function TaskRow({ task, onChange }) {
         }}
       >
         <button
-          onClick={handleToggle}
+          onClick={() => handleToggle(task)}
           style={{ background: "none", border: "none", cursor: "pointer" }}
           title={done ? "Desfazer conclusão" : "Marcar como concluída"}
         >
