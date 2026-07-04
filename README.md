@@ -1,12 +1,12 @@
-# 📅 Planly
+# Planly
 
 Plataforma de planejamento pessoal com **arquitetura de microsserviços**, gamificação de hábitos e análise de produtividade — construída para explorar comunicação entre serviços, filas de mensagens e observabilidade em um cenário mais próximo do mundo real.
 
-## 🧠 Sobre o projeto
+## Sobre o projeto
 
 O Planly ajuda o usuário a organizar tarefas e blocos fixos de horário, avisa quando a agenda está sobrecarregada e transforma o hábito de planejar em conquistas e streaks. O diferencial do projeto não é a UI, e sim a **arquitetura**: em vez de um monólito, o sistema é dividido em quatro serviços independentes que se comunicam via REST e RabbitMQ, com um frontend React consumindo todos eles.
 
-## 🏗️ Arquitetura
+## Arquitetura
 
 O sistema segue uma arquitetura de microsserviços: o **frontend React** consome quatro serviços de backend independentes. Os serviços Node se comunicam entre si via **RabbitMQ** (ex: o planning-service publica um evento quando uma tarefa é concluída, e o gamification-service consome esse evento para atualizar conquistas e streaks). Todos compartilham dados em **PostgreSQL**, com **Redis** para cache/filas auxiliares.
 
@@ -16,7 +16,7 @@ O sistema segue uma arquitetura de microsserviços: o **frontend React** consome
 - **analytics-service** — não guarda dados próprios: consulta o planning-service via HTTP e calcula métricas de produtividade (precisão planejado vs. realizado, tendência mensal, sugestões de calibração).
 - **frontend** — SPA em React que integra os quatro serviços (dashboard, tarefas, calendário, progresso, conquistas, perfil).
 
-## 🛠️ Stack técnica
+## Stack técnica
 
 | Camada | Tecnologias |
 |---|---|
@@ -28,7 +28,7 @@ O sistema segue uma arquitetura de microsserviços: o **frontend React** consome
 | Testes | Vitest, Supertest, Testing Library |
 | Infra / Deploy | Docker, Docker Compose, [Render](https://render.com) (`render.yaml`) |
 
-## 🚀 Rodando localmente
+##  Rodando localmente
 
 Pré-requisitos: Docker e Docker Compose instalados.
 
@@ -56,7 +56,7 @@ Serviços disponíveis após subir os containers:
 
 Todos os serviços expõem um endpoint `/health` para checagem rápida de disponibilidade.
 
-## ✅ Testes
+## Testes
 
 Cada serviço Node possui sua própria suíte com Vitest/Supertest, e o frontend usa Vitest + Testing Library:
 
@@ -67,11 +67,11 @@ npm test
 
 No Windows também há um script auxiliar para rodar tudo de uma vez: `run-tests.ps1`.
 
-## ☁️ Deploy
+## Deploy
 
 O arquivo `render.yaml` descreve o deploy dos quatro serviços e do frontend estático na [Render](https://render.com), incluindo variáveis de ambiente compartilhadas entre serviços via `fromService`.
 
-## 📁 Estrutura de pastas
+## Estrutura de pastas
 
 ```
 Planly/
@@ -87,7 +87,3 @@ Planly/
 ├── docker-compose.yml
 └── render.yaml
 ```
-
-## 👤 Autor
-
-Desenvolvido por [Luciano Paixão](https://github.com/Lucianoopaixao).
